@@ -54,7 +54,7 @@ def get_file(message: Message):
 
 
 async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != USER_ID:
+    if update.message.from_user.id != USER_ID:
         await context.bot.send_message(chat_id=update.effective_chat.id, text="Forbidden")
         return
     try:
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     start_handler = CommandHandler('start', start)
     application.add_handler(start_handler)
 
-    upload_handler = MessageHandler(filters.ATTACHMENT, upload)
+    upload_handler = MessageHandler(filters.ATTACHMENT & filters.USER, upload)
     application.add_handler(upload_handler)
 
     application.run_polling()
