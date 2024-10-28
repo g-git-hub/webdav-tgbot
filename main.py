@@ -14,9 +14,13 @@ from webdav3.exceptions import WebDavException
 
 load_dotenv()
 
+# 将日志输出到标准输出
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    level=logging.INFO,
+    handlers=[
+        logging.StreamHandler()  # 将日志输出到标准输出
+    ]
 )
 
 options = {
@@ -48,9 +52,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def get_file(message: Message):
     try:
-        return message.photo[-1].file_id or message.document
+        if message.photo:
+            return message.photo[-1].file_id
+        if message.document:
+            return message.document.file_id
+        if message.video:
+            return message.video.file_id
+        if message.audio:
+            return message.audio.file_id
+        if message.voice:
+            return message.voice.file_id
+        if message.video_note:
+            return message.video_note.file_id
+        if message.forward_from or message.forward_from_chat:
+            if message.photo:
+                return message.photo[-1].file_id
+            if message.document:
+                return message.document.file_id
+            if message.video:
+                return message.video.file_id
+            if message.audio:
+                return message.audio.file_id
+            if message.voice:
+                return message.voice.file_id
+            if message.video_note:
+                return message.video_note.file_id
     except IndexError:
-        return message.document
+        return None
 
 
 async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -58,7 +86,10 @@ async def upload(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=update.effective_chat.id, text="Forbidden")
         return
     try:
-        file = await context.bot.get_file(get_file(update.message))
+        file_id = get_file(update.message)
+        if not file_id:
+            raise TelegramError("File ID not found")
+        file = await context.bot.get_file(file_id)
     except TelegramError:
         await context.bot.send_message(chat_id=update.effective_chat.id, text="Couldn't find a file")
         return
@@ -84,7 +115,11 @@ if __name__ == '__main__':
     start_handler = CommandHandler('start', start)
     application.add_handler(start_handler)
 
-    upload_handler = MessageHandler(filters.ATTACHMENT & filters.USER, upload)
+    # 修正过滤器以处理转发消息
+    upload_handler = MessageHandler(
+        filters.ChatType.PRIVATE & (filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.AUDIO | filters.VOICE | filters.VIDEO_NOTE | filters.FORWARDED),
+        upload
+    )
     application.add_handler(upload_handler)
 
     application.run_polling()
